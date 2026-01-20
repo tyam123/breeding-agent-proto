@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Breeding Runs Viewer (Proto)</title>
+  <style>
+    body { font-family: sans-serif; margin: 24px; }
+    input, button { font-size: 16px; padding: 6px 10px; }
+    table { border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; }
+    .row { margin: 12px 0; }
+    code { background:#f6f6f6; padding:2px 6px; }
+  </style>
+</head>
+<body>
+  <h1>Breeding Runs Viewer (Proto)</h1>
+
+  <div class="row">
+    <label>run_id: </label>
+    <input id="runId" value="example_run_001" />
+    <button id="btn">Load</button>
+  </div>
+
+  <div class="row" id="meta"></div>
+  <div class="row" id="links"></div>
+  <div id="table"></div>
+
+<script>
+async function fetchText(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`fetch failed: ${r.status}`);
+  return await r.text();
+}
+
+function csvToTable(csv) {
+  const lines = csv.trim().split(/\r?\n/);
+  const rows = lines.map(l => l.split(","));
+  const header = rows.shift();
+
+  let html = "<table><thead><tr>";
+  for (const h of header) html += `<th>${h}</th>`;
+  html += "</tr></thead><tbody>";
+
+  for (const row of rows) {
+    html += "<tr>";
+    for (const cell of row) html += `<td>${cell}</td>`;
+    html += "</tr>";
+  }
+  html += "</tbody></table>";
+  return html;
+}
+
+document.getElementById("btn").addEventListener("click", async () => {
+  const runId = document.getElementById("runId").value.trim();
+  document.getElementById("meta").textContent = "Loading...";
+  document.getElementById("links").textContent = "";
+  document.getElementById("table").innerHTML = "";
+
+  try {
+    const api = `/api/runs?run_id=${encodeURIComponent(runId)}`;
+    const res = await fetch(api);
+    if (!res.ok) throw new Error(`API failed: ${res.status}`);
+    const j = await res.json();
+
+    document.getElementById("meta").innerHTML =
+      `run_id=<code>${j.run_id}</code> blob=<code>${j.blob_name}</code>`;
+
+    const url = j.summary_csv_sas_url;
+    document.getElementById("links").innerHTML =
+      `<a href="${url}" target="_blank">Download summary.csv (SAS)</a>`;
+
+    const csv = await fetchText(url);
+    document.getElementById("table").innerHTML = csvToTable(csv);
+  } catch (e) {
+    document.getElementById("meta").textContent = "Error: " + e.message;
+  }
+});
+</script>
+</body>
+</html>
